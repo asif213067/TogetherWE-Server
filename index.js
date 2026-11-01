@@ -42,56 +42,47 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
+
 app.get("/all-events", async (req, res) => {
   try {
     const startOfToday = new Date();
     startOfToday.setUTCHours(0, 0, 0, 0);
 
     const events = await eventsCollection
-      .find(
-        { eventDate: { $gte: startOfToday } },
-        { projection: listProjection },
-      )
+      .find({ eventDate: { $gte: startOfToday } })
       .sort({ eventDate: 1, _id: 1 })
       .toArray();
 
     res.json(events);
   } catch (error) {
-    console.error(error);
+    console.error("Failed to load events:", error);
     res.status(500).json({ message: "Failed to load events" });
   }
 });
 
 app.get("/events/:id", async (req, res) => {
   try {
-      const { id } = req.params;
-      console.log("event request:", req.params.id);
-      
+    const { id } = req.params;
 
-    if (!isObjectId(id)) {
-      return res.status(404).json({ message: "Event not found" });
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return res.status(400).json({ message: "Invalid event ID" });
     }
 
-    const startOfToday = new Date();
-    startOfToday.setUTCHours(0, 0, 0, 0);
-
-    const event = await eventsCollection.findOne(
-      { $or: [{ _id: new ObjectId(id) }, { _id: id }] },
-      {
-        projection: {
-          ...listProjection,
-          hasEnded: { $lt: ["$eventDate", startOfToday] },
-        },
-      },
-    );
+    const event = await eventsCollection.findOne({
+      _id: new ObjectId(id),
+    });
 
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
 
-      res.json(event);
+    res.json({
+      ...event,
+      participantCount: event.participants?.length ?? 0,
+      hasEnded: new Date(event.eventDate) < new Date(),
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Single event error:", error);
     res.status(500).json({ message: "Failed to load event" });
   }
 });
