@@ -24,6 +24,7 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("togetherWe");
 const eventsCollection = db.collection("events");
+const galleryCollection = db.collection("gallery");
 
 const listProjection = {
   slug: 1,
@@ -84,6 +85,20 @@ app.get("/events/:id", async (req, res) => {
   } catch (error) {
     console.error("Single event error:", error);
     res.status(500).json({ message: "Failed to load event" });
+  }
+});
+
+app.get("/gallery", async (req, res) => {
+  try {
+    const items = await galleryCollection
+      .find({}, { projection: { title: 1, location: 1, image: 1 } })
+      .sort({ createdAt: -1, _id: -1 })
+      .toArray();
+
+    res.json(items);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to load gallery" });
   }
 });
 
