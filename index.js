@@ -40,7 +40,7 @@ const listProjection = {
 const isObjectId = (value) => /^[a-f\d]{24}$/i.test(value);
 
 app.get("/", (req, res) => {
-  res.send("Hello World Asif Khan!");
+  res.send("Hello Asif Khan!");
 });
 
 
