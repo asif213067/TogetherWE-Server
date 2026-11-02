@@ -102,6 +102,29 @@ app.get("/gallery", async (req, res) => {
   }
 });
 
+
+// ============ Get Recent upcoming events ===============
+app.get("/recent-events", async (req, res) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+
+    const events = await eventsCollection
+      .find(
+        { eventDate: { $gte: startOfToday } },
+        { projection: listProjection },
+      )
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(6)
+      .toArray();
+
+    res.json(events);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to load recent events" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`server is running on port ${PORT}`);
 });
