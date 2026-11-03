@@ -85,6 +85,10 @@ const startOfToday = () => {
   return date;
 };
 
+const GRACE_PERIOD_MS = 60 * 1000; // 1 minute
+
+const upcomingCutoff = () => new Date(Date.now() - GRACE_PERIOD_MS);
+
 async function createUniqueSlug(title) {
   const baseSlug =
     title
@@ -114,11 +118,13 @@ app.get("/", (req, res) => {
   res.send("Hello Asif Khan!");
 });
 
+
+// =============== Get all evets for Upcoming events Page ============
 app.get("/all-events", async (req, res) => {
   try {
     const events = await eventsCollection
       .find(
-        { eventDate: { $gte: startOfToday() } },
+        { eventDate: { $gte: upcomingCutoff() } },
         { projection: listProjection },
       )
       .sort({ eventDate: 1, _id: 1 })
@@ -131,11 +137,13 @@ app.get("/all-events", async (req, res) => {
   }
 });
 
+
+// =============== Get recent created 6 evets for landing page Page ============
 app.get("/recent-events", async (req, res) => {
   try {
     const events = await eventsCollection
       .find(
-        { eventDate: { $gte: startOfToday() } },
+        { eventDate: { $gte: upcomingCutoff() } },
         { projection: listProjection },
       )
       .sort({ createdAt: -1, _id: -1 })
