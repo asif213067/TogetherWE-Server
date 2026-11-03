@@ -8,7 +8,10 @@ import { verifyToken } from "./middleware/verify-token.js";
 import { validateEventInput, normalizeEventText } from "./utils/validate-event.js";
 
 const app = express();
-app.use(cors({ origin: process.env.CLIENT_URL }));
+
+const clientUrl = (process.env.CLIENT_URL ?? "").replace(/\/+$/, "");
+app.use(cors({ origin: [clientUrl, "http://localhost:3000"] }));
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
