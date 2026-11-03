@@ -366,6 +366,215 @@ app.post("/create-event", verifyToken, async (req, res) => {
   }
 });
 
+
+// =========================== last
+const countParticipants = async (eventId) => {
+  const event = await eventsCollection.findOne(
+    { _id: eventId },
+    { projection: { participantCount } },
+  );
+
+  return event?.participantCount ?? 0;
+};
+
+app.get("/events/:id/participation", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isObjectId(id)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+    }
+
+    const event = await eventsCollection.findOne(
+      { _id: new ObjectId(id) },
+      {
+        projection: {
+          participantCount,
+          joined: {
+            $in: [req.user.id, { $ifNull: ["$participants.userId", []] }],
+          },
+        },
+      },
+    );
+
+    if (!event) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+    }
+
+    res.json({
+      joined: event.joined === true,
+      participantCount: event.participantCount,
+    });
+  } catch (error) {
+    console.error("Participation error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load participation" });
+  }
+});
+
+app.post("/events/:id/join", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isObjectId(id)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+    }
+
+    const eventId = new ObjectId(id);
+
+    const result = await eventsCollection.updateOne(
+      {
+        _id: eventId,
+        eventDate: { $gt: new Date() },
+        "participants.userId": { $ne: req.user.id },
+      },
+      {
+        $push: {
+          participants: {
+            userId: req.user.id,
+            name: req.user.name ?? "",
+            joinedAt: new Date(),
+          },
+        },
+      },
+    );
+
+    if (result.matchedCount === 0) {
+      const event = await eventsCollection.findOne(
+        { _id: eventId },
+        { projection: { eventDate: 1 } },
+      );
+
+      if (!event) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Event not found" });
+      }
+
+      if (new Date(event.eventDate) <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "This event has already ended.",
+        });
+      }
+
+      return res.status(409).json({
+        success: false,
+        message: "You have already joined this event.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "You have joined this event.",
+      joined: true,
+      participantCount: await countParticipants(eventId),
+    });
+  } catch (error) {
+    console.error("Join event error:", error);
+    res.status(500).json({ success: false, message: "Failed to join event" });
+  }
+});
+
+app.delete("/events/:id/join", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isObjectId(id)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+    }
+
+    const eventId = new ObjectId(id);
+
+    const result = await eventsCollection.updateOne(
+      { _id: eventId },
+      { $pull: { participants: { userId: req.user.id } } },
+    );
+
+    if (result.matchedCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "You have left this event.",
+      joined: false,
+      participantCount: await countParticipants(eventId),
+    });
+  } catch (error) {
+    console.error("Leave event error:", error);
+    res.status(500).json({ success: false, message: "Failed to leave event" });
+  }
+});
+
+app.get("/joined-events", verifyToken, async (req, res) => {
+  try {
+    const events = await eventsCollection
+      .aggregate([
+        { $match: { "participants.userId": req.user.id } },
+        {
+          $addFields: {
+            participantCount,
+            hasEnded: { $lt: ["$eventDate", "$$NOW"] },
+            organizerName: {
+              $ifNull: ["$organizerName", "Community organizer"],
+            },
+            joinedAt: {
+              $first: {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: "$participants",
+                      as: "p",
+                      cond: { $eq: ["$$p.userId", req.user.id] },
+                    },
+                  },
+                  as: "p",
+                  in: "$$p.joinedAt",
+                },
+              },
+            },
+          },
+        },
+        { $sort: { hasEnded: 1, eventDate: 1, _id: 1 } },
+        {
+          $project: {
+            slug: 1,
+            title: 1,
+            description: 1,
+            eventType: 1,
+            thumbnail: 1,
+            location: 1,
+            eventDate: 1,
+            participantCount: 1,
+            hasEnded: 1,
+            organizerName: 1,
+            joinedAt: 1,
+          },
+        },
+      ])
+      .toArray();
+
+    res.json(events);
+  } catch (error) {
+    console.error("Joined events error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load joined events" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`server is running on port ${PORT}`);
 });
