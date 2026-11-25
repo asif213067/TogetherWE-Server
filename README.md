@@ -330,8 +330,9 @@ notification system.
 **Asif Hosen**\
 Full-Stack Developer
 
--   Frontend: https://togetherwe-client-by-asif.vercel.app
--   GitHub: https://github.com/asif213067
+Website: https://asif-hosen.vercel.app
+GitHub: https://github.com/asif213067
+Linkedin: https://www.linkedin.com/in/asif-hosen
 
 ------------------------------------------------------------------------
 
